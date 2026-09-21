@@ -66,8 +66,16 @@ class FourU_Lodgify_Webhooks {
 		return $j;
 	}
 
-	public static function url_reception() {
-		return rest_url( '4u-lodgify/v1/webhook' ) . '?jeton=' . rawurlencode( self::jeton() );
+	/**
+	 * URL de reception. Le suffixe « evt » n'est pas decoratif : Lodgify
+	 * refuse en 409 une seconde inscription sur une URL DEJA utilisee, quel
+	 * que soit l'evenement (mesure du 21/09/2026 : 1 inscription passe, les
+	 * 7 suivantes repartent en 409 ; avec une URL distincte par evenement,
+	 * les 8 passent). Il faut donc une URL unique par evenement.
+	 */
+	public static function url_reception( $evenement = '' ) {
+		$u = rest_url( '4u-lodgify/v1/webhook' ) . '?jeton=' . rawurlencode( self::jeton() );
+		return $evenement ? $u . '&evt=' . rawurlencode( $evenement ) : $u;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -94,6 +102,13 @@ class FourU_Lodgify_Webhooks {
 	public static function recevoir( WP_REST_Request $requete ) {
 		$debut = microtime( true );
 		$corps = (array) $requete->get_json_params();
+
+		/* Les en-tetes sont consignes une fois : Lodgify renvoie un secret a
+		   l'inscription mais ne documente pas l'en-tete de signature. Le seul
+		   moyen de le trouver est de regarder une livraison reelle. */
+		if ( ! get_option( 'fouru_lodgify_entetes_vus' ) ) {
+			update_option( 'fouru_lodgify_entetes_vus', array_keys( (array) $requete->get_headers() ), false );
+		}
 		$evt   = (string) ( $corps['event'] ?? $corps['event_type'] ?? $requete->get_param( 'event' ) ?? '' );
 		$pid   = self::extraire_property_id( $corps );
 
@@ -231,11 +246,30 @@ class FourU_Lodgify_Webhooks {
 		return json_decode( wp_remote_retrieve_body( $r ), true );
 	}
 
-	public static function abonner( $cle, $evenement ) {
-		return self::appel( '/subscribe', array(
+	/**
+	 * Abonne un evenement et conserve le secret renvoye par Lodgify.
+	 *
+	 * Contrairement a ce que laissait croire la documentation, /subscribe
+	 * renvoie bien un « secret » par inscription. Il est range en base, jamais
+	 * dans le depot, et servira a verifier la signature des appels entrants
+	 * une fois l'en-tete utilise identifie sur une livraison reelle.
+	 */
+	public static function abonner( $cle, $evenement, $website_id = '' ) {
+		$r = self::appel( '/subscribe', array(
 			'event'      => $evenement,
-			'target_url' => self::url_reception(),
+			'target_url' => self::url_reception( $evenement ),
 		), $cle );
+		if ( ! is_wp_error( $r ) && ! empty( $r['corps']['id'] ) ) {
+			$abos = (array) get_option( 'fouru_lodgify_abonnements', array() );
+			$abos[ $r['corps']['id'] ] = array(
+				'evenement'  => $evenement,
+				'website_id' => $website_id,
+				'secret'     => (string) ( $r['corps']['secret'] ?? '' ),
+				'pose_le'    => current_time( 'mysql' ),
+			);
+			update_option( 'fouru_lodgify_abonnements', $abos, false );
+		}
+		return $r;
 	}
 
 	public static function desabonner( $cle, $id ) {

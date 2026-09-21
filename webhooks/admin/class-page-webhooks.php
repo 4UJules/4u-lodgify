@@ -38,7 +38,7 @@ class FourU_Lodgify_Page_Webhooks {
 		$cle = FourU_Lodgify_Comptes::cle_api( $w );
 		$ok = 0; $ko = array();
 		foreach ( FourU_Lodgify_Webhooks::evenements() as $e ) {
-			$r = FourU_Lodgify_Webhooks::abonner( $cle, $e );
+			$r = FourU_Lodgify_Webhooks::abonner( $cle, $e, $w );
 			if ( ! is_wp_error( $r ) && $r['code'] >= 200 && $r['code'] < 300 ) { $ok++; }
 			else { $ko[] = $e . ' (' . ( is_wp_error( $r ) ? $r->get_error_message() : $r['code'] ) . ')'; }
 		}
