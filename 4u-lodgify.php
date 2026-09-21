@@ -67,3 +67,60 @@ register_activation_hook( __FILE__, function () {
    la nouvelle implementation avant de retirer JetBooking. */
 require_once FOURU_LODGIFY_DIR . 'filtres/class-filtre-dates.php';
 FourU_Lodgify_Filtre_Dates::init();
+
+/**
+ * Modules rapatries de lodgify-availability-sync.
+ *
+ * Le garde ci-dessus ne concerne que « comptes » et « calendrier », dont
+ * l'ancien plugin embarque une copie mot pour mot : memes classes, memes
+ * fonctions, donc redeclaration fatale si les deux se chargent. Les modules
+ * rapatries, eux, portent des noms neufs en FourU_Lodgify_* et n'entrent en
+ * collision avec rien : ils peuvent donc se charger TOUJOURS.
+ *
+ * Contrat d'un module rapatrie, pour que la bascule reste reversible :
+ *
+ *   1. il se charge dans tous les cas, mais reste INERTE tant que son option
+ *      vaut autre chose que 'oui' ;
+ *   2. quand son option est levee, il commence par retirer l'enregistrement
+ *      equivalent de l'ancien plugin (remove_action / remove_filter, ou
+ *      remove_all_actions sur l'action AJAX concernee) AVANT de poser le sien,
+ *      sinon les deux repondent et c'est le dernier inscrit qui gagne ;
+ *   3. il expose OPTION et init(), comme FourU_Lodgify_Filtre_Dates.
+ *
+ * La bascule se fait donc par module ET par site, et se defait en remettant
+ * l'option a 'non'. Desactiver lodgify-availability-sync devient du nettoyage
+ * de fin de course, et non le moment risque.
+ *
+ * Voir CONSOLIDATION.md, §4 et §5.
+ */
+foreach ( array(
+	/* 'A. synchro'      => 'synchro/class-synchro.php',        FourU_Lodgify_Synchro      */
+	/* 'B. reservation'  => 'reservation/class-reservation.php', FourU_Lodgify_Reservation */
+	/* 'C. prix'         => 'prix/class-prix.php',               FourU_Lodgify_Prix        */
+) as $fouru_module ) {
+	$fouru_chemin = FOURU_LODGIFY_DIR . $fouru_module;
+	if ( file_exists( $fouru_chemin ) ) {
+		require_once $fouru_chemin;
+	}
+}
+unset( $fouru_module, $fouru_chemin );
+
+/**
+ * Etat de la bascule, pour l'ecran d'administration et pour le diagnostic.
+ *
+ * @return array<string,bool> nom du module => actif
+ */
+function fouru_lodgify_modules_actifs() {
+	$etat = array();
+	foreach ( array(
+		'FourU_Lodgify_Filtre_Dates',
+		'FourU_Lodgify_Synchro',
+		'FourU_Lodgify_Reservation',
+		'FourU_Lodgify_Prix',
+	) as $classe ) {
+		if ( class_exists( $classe ) && defined( $classe . '::OPTION' ) ) {
+			$etat[ $classe ] = ( 'oui' === get_option( constant( $classe . '::OPTION' ), 'non' ) );
+		}
+	}
+	return $etat;
+}
