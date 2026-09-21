@@ -3,6 +3,9 @@
 Intégration Lodgify unifiée pour les sites de location de Sint Maarten.
 Remplace progressivement `lodgify-availability-sync`.
 
+_Copyright (c) 2026 4U Real Estate Agency. All rights reserved._
+_Propriétaire — tous droits réservés. Diffusion et réutilisation interdites sans accord écrit._
+
 ## Modules
 
 | Module | Rôle |
@@ -33,3 +36,7 @@ introduite.
 
 Sauvegarde automatique avant chaque déploiement, `php -l` sur tous les fichiers,
 abandon du site si un contrôle échoue.
+
+---
+
+Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
