@@ -67,15 +67,20 @@ class FourU_Lodgify_Webhooks {
 	}
 
 	/**
-	 * URL de reception. Le suffixe « evt » n'est pas decoratif : Lodgify
-	 * refuse en 409 une seconde inscription sur une URL DEJA utilisee, quel
-	 * que soit l'evenement (mesure du 21/09/2026 : 1 inscription passe, les
-	 * 7 suivantes repartent en 409 ; avec une URL distincte par evenement,
-	 * les 8 passent). Il faut donc une URL unique par evenement.
+	 * URL de reception, unique par SITE + COMPTE + EVENEMENT.
+	 *
+	 * Lodgify refuse en 409 « This callback url already exists » toute
+	 * inscription sur une URL deja enregistree, et cette unicite est
+	 * GLOBALE, pas par compte : mesure du 21/09/2026, le compte 479060
+	 * s'etant abonne le premier sur quatre sites, le compte 453125 se
+	 * heurtait a ses URL et ne pouvait s'abonner que sur thehills, seul site
+	 * ou 479060 n'est pas actif. Le suffixe « cpt » leve la collision.
 	 */
-	public static function url_reception( $evenement = '' ) {
+	public static function url_reception( $evenement = '', $website_id = '' ) {
 		$u = rest_url( '4u-lodgify/v1/webhook' ) . '?jeton=' . rawurlencode( self::jeton() );
-		return $evenement ? $u . '&evt=' . rawurlencode( $evenement ) : $u;
+		if ( $website_id ) { $u .= '&cpt=' . rawurlencode( $website_id ); }
+		if ( $evenement )  { $u .= '&evt=' . rawurlencode( $evenement ); }
+		return $u;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -267,7 +272,7 @@ class FourU_Lodgify_Webhooks {
 	public static function abonner( $cle, $evenement, $website_id = '' ) {
 		$r = self::appel( '/subscribe', array(
 			'event'      => $evenement,
-			'target_url' => self::url_reception( $evenement ),
+			'target_url' => self::url_reception( $evenement, $website_id ),
 		), $cle );
 		if ( ! is_wp_error( $r ) && ! empty( $r['corps']['id'] ) ) {
 			$abos = (array) get_option( 'fouru_lodgify_abonnements', array() );
