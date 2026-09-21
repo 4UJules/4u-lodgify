@@ -1,0 +1,24 @@
+# Aucune cle, aucun log, aucune sauvegarde dans le depot.
+*.bak
+*.bak-*
+*.backup
+*.backup-*
+*-backup-*
+*.COMPROMISED
+*.OLD-*
+*.log
+logs/
+*.sql
+*.sql.gz
+.env
+.env.*
+*.pem
+*.key
+id_*
+*_rsa
+*_ed25519
+secrets*
+config-local*
+.DS_Store
+node_modules/
+vendor/

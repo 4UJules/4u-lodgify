@@ -1,0 +1,267 @@
+/**
+ * Calendrier Lodgify — styles par defaut.
+ * Tout ce qui est reglable depuis Elementor est surcharge par des selecteurs
+ * {{WRAPPER}} : ces valeurs ne sont que le point de depart.
+ */
+
+.lcal {
+    --lcal-day-size: 46px;
+    box-sizing: border-box;
+    width: 100%;
+    /* marges internes reduites : le calendrier respire par sa largeur */
+    padding: 4px 0;
+}
+
+.lcal *,
+.lcal *::before,
+.lcal *::after { box-sizing: inherit; }
+
+/* Par defaut le calendrier occupe toute la largeur de son conteneur : les mois
+   se partagent l'espace, les cases suivent. Tout reste ajustable depuis
+   Elementor (taille des cases, espacement entre mois, marges du cadre). */
+.lcal-body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+
+.lcal-months {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 44px;
+    flex: 1 1 auto;
+    width: 100%;
+    justify-content: space-between;
+}
+
+/* flex: 1 1 0 -> les mois se partagent la largeur a egalite */
+.lcal-month { flex: 1 1 0; min-width: 0; }
+
+.lcal-month-name {
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.lcal-dow,
+.lcal-days {
+    display: grid;
+    /* fractions et non largeur fixe : la grille remplit le mois */
+    grid-template-columns: repeat(7, 1fr);
+    width: 100%;
+}
+
+.lcal-dow span {
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.7;
+    padding-bottom: 6px;
+}
+
+.lcal-day {
+    min-height: var(--lcal-day-size);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1.1;
+    border-radius: 50%;
+    /* lecture seule : aucun curseur d'interaction */
+    cursor: default;
+    user-select: none;
+}
+
+.lcal-day.is-empty { visibility: hidden; }
+
+/* Jour dont la nuit ET la veille sont occupees. Un jour "depart uniquement"
+   n'entre pas ici : il s'affiche comme un jour libre. */
+.lcal-day.is-booked {
+    color: #b0b0b0;
+    text-decoration: line-through;
+}
+
+.lcal-day.is-past { opacity: 0.35; }
+
+.lcal-day.is-today { font-weight: 700; }
+
+/* Emplacement prevu pour le prix par nuit. Masque tant que la donnee
+   n'est pas alimentee : le simple fait d'activer le reglage l'affichera. */
+.lcal-price {
+    display: block;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.8;
+    margin-top: 1px;
+}
+
+.lcal-nav {
+    background: none;
+    border: 0;
+    font-size: 26px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    color: inherit;
+}
+
+.lcal-nav[disabled] { opacity: 0.25; cursor: default; }
+
+.lcal-loading {
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.7;
+    padding: 12px 0;
+}
+
+.lcal-legend {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin-top: 14px;
+    font-size: 13px;
+}
+
+.lcal-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+
+.lcal-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.lcal-swatch-free   { background: #ffffff; }
+.lcal-swatch-booked { background: #e0e0e0; }
+
+/* Mobile : un seul mois, cases un peu plus grandes pour rester tactiles. */
+@media (max-width: 767px) {
+    .lcal { --lcal-day-size: 38px; }
+    .lcal-months { gap: 0; }
+}
+
+/* Mention : le prix affiche est le tarif nuitee seul. */
+.lcal-note {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 6px;
+}
+
+.lcal-legend { flex-wrap: wrap; }
+
+
+/* ---------- Selection des dates, facon Airbnb (SEL_AIRBNB_2026-09-21) ----------
+   Reference : capture Airbnb fournie le 21/09/2026.
+   - la bande est un ::before centre verticalement, de MEME hauteur que les
+     ronds, et elle passe DERRIERE eux (z-index negatif) : c'est ce qui donne
+     une bande continue plutot que des carres separes ;
+   - les ronds sont un ::after, pleins, texte en blanc par-dessus ;
+   - aux extremites la bande ne couvre qu'une demi-case, donc elle sort de
+     sous le rond sans depasser de l'autre cote ;
+   - l'arrondi de fin de semaine et de reprise vient de nth-child(7n) et
+     nth-child(7n+1) : aucune classe supplementaire a poser en JS ;
+   - au survol, un simple contour (rond vide), jamais de remplissage.
+   Tout est pilote par des variables, surchargees depuis l'onglet Style. */
+
+.lcal {
+    --lcal-sel-h:    44px;
+    --lcal-sel-r:    22px;
+    --lcal-sel-bg:   #222222;
+    --lcal-sel-fg:   #ffffff;
+    --lcal-band-bg:  #ebebeb;
+    --lcal-band-fg:  #222222;
+    --lcal-ring:     #222222;
+}
+
+.lcal-day {
+    position: relative;
+    /* borne les z-index negatifs a la case : la bande ne peut pas glisser
+       derriere le fond du conteneur */
+    isolation: isolate;
+}
+
+.lcal-selectable .lcal-day.is-free { cursor: pointer; }
+
+/* Survol : rond vide, simple contour. */
+.lcal-selectable .lcal-day.is-free:not(.is-start):not(.is-end):hover::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--lcal-sel-h);
+    height: var(--lcal-sel-h);
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--lcal-ring);
+    border-radius: 50%;
+    z-index: -1;
+}
+
+/* La bande. */
+.lcal-day.is-between::before,
+.lcal-day.is-start.has-range::before,
+.lcal-day.is-end.has-range::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    height: var(--lcal-sel-h);
+    transform: translateY(-50%);
+    background: var(--lcal-band-bg);
+    z-index: -2;
+}
+
+.lcal-day.is-between::before          { left: 0;   right: 0; }
+.lcal-day.is-start.has-range::before  { left: 50%; right: 0; }
+.lcal-day.is-end.has-range::before    { left: 0;   right: 50%; }
+
+/* Fin de semaine : la bande s'arrondit ; elle reprend arrondie le lundi. */
+.lcal-days .lcal-day:nth-child(7n)::before {
+    border-top-right-radius: var(--lcal-sel-r);
+    border-bottom-right-radius: var(--lcal-sel-r);
+}
+.lcal-days .lcal-day:nth-child(7n+1)::before {
+    border-top-left-radius: var(--lcal-sel-r);
+    border-bottom-left-radius: var(--lcal-sel-r);
+}
+
+.lcal-day.is-between { color: var(--lcal-band-fg); }
+
+/* Les ronds d'arrivee et de depart. */
+.lcal-day.is-start::after,
+.lcal-day.is-end::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--lcal-sel-h);
+    height: var(--lcal-sel-h);
+    transform: translate(-50%, -50%);
+    background: var(--lcal-sel-bg);
+    border-radius: 50%;
+    z-index: -1;
+}
+
+.lcal-day.is-start,
+.lcal-day.is-end { color: var(--lcal-sel-fg); }
+
+/* Le prix reste lisible sur le rond plein. */
+.lcal-day.is-start .lcal-price,
+.lcal-day.is-end   .lcal-price { opacity: 1; }
+
+.lcal-message {
+    display: none;
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: #fff4e5;
+    border: 1px solid #f0c99a;
+    border-radius: 6px;
+    color: #8a4b00;
+    font-size: 13px;
+    text-align: center;
+}

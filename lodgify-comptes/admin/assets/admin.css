@@ -1,0 +1,15 @@
+.fouru-lodgify .fouru-form { background:#fff; border:1px solid #dcdcde; padding:4px 18px 10px; }
+.fouru-lodgify .fouru-table { margin-top:12px; }
+.fouru-lodgify .fouru-actions .button { margin:2px 2px 2px 0; }
+.fouru-lodgify .fouru-ok { color:#1a7f37; }
+.fouru-lodgify .fouru-ko { color:#b32d2e; }
+.fouru-lodgify .fouru-inactif { background:#f0f0f1; border-radius:3px; padding:1px 6px; font-size:11px; margin-left:6px; }
+.fouru-lodgify .fouru-biens-ligne td { background:#fbfbfc; }
+.fouru-lodgify .fouru-grille { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:10px 22px; }
+.fouru-lodgify .fouru-bien { border:1px solid #e6e6e8; border-radius:5px; padding:8px 10px; background:#fff; }
+.fouru-lodgify .fouru-bien .description { font-size:11px; }
+.fouru-lodgify .fouru-assoc { margin-top:5px; font-size:12px; }
+.fouru-lodgify .fouru-sug { margin:5px 0 0; }
+.fouru-lodgify .fouru-sug li { margin:0 0 4px; line-height:1.6; }
+.fouru-lodgify .fouru-titre { font-weight:600; }
+.fouru-lodgify .fouru-score { color:#646970; font-size:11px; }
