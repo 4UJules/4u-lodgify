@@ -97,21 +97,35 @@ Bascule par module **et** par site, réversible en basculant une option.
 
 ## 5. Ordre des incréments
 
-**A. La synchro** — `includes/class-availability-manager.php` (1 066 l.) et la réconciliation du
-fichier principal : écriture de `lodgify_availabilities`, puis report vers `jet_apartment_bookings`
-en lignes `external`. C'est le **producteur** que tout le reste lit ; le webhook de `4u-lodgify` ne
-fait aujourd'hui que déclencher cette synchro-là. À faire en premier, et le §2 en est le prérequis.
+Ordre fixé par le propriétaire le 2026-09-21 — il diffère de l'ordre technique :
+le filtre de dates passe en premier parce qu'il est déjà écrit et déployé.
 
-**B. La réservation** — `elementor/widgets/airbnb-booking-widget.php` (1 142 l.),
+**a. Filtre de dates** — `filtres/class-filtre-dates.php`. S'applique à la page
+Vacation Rentals (thehills : page **9**, `query_id` **filter-vacation-en** / **filter-vacation**),
+vers laquelle redirige la barre de recherche de l'accueil ; l'accueil, lui, affiche des biens
+en vedette non filtrés. Activé sur thehills, à propager après contrôle.
+
+**b. Réservation** — `elementor/widgets/airbnb-booking-widget.php` (1 142 l.),
 `assets/js/airbnb-booking.js` (1 295 l., avec le pont `lodgify:dates`), le popup, et l'endpoint
 `lodgify_get_unavailable_dates`.
 
-**C. Les prix** — devis `lodgify_get_price`, `includes/class-daily-prices-sync.php` (688 l.),
+**c. Prix** — devis `lodgify_get_price`, `includes/class-daily-prices-sync.php` (688 l.),
 `class-prices-manager.php`, `class-min-stay-filter.php` (925 l.), les dynamic tags prix/jour et
-séjour minimum, et le cron hebdomadaire des prix.
+séjour minimum, et le cron hebdomadaire des prix. **Le séjour minimum** y est traité à part :
+reprendre le mécanisme existant (`min_stay_error` du devis), pas le réécrire, en corrigeant
+trois défauts — prix « 0,00 € for 1 night » affiché sous le message, blocage a posteriori au lieu
+d'un grisé préventif, et message anglais sur les pages FR.
 
-Le module **Calendrier** est déjà dans `4u-lodgify` mais en **double** avec la copie de l'ancien
-plugin ; il ne devient réellement unique qu'une fois A, B et C passés et l'ancien plugin désactivé.
+**d. La synchro** — `includes/class-availability-manager.php` (1 066 l.) et la réconciliation du
+fichier principal : écriture de `lodgify_availabilities`, puis report vers `jet_apartment_bookings`
+en lignes `external`. C'est le producteur que tout le reste lit ; le §2 en est le prérequis.
+
+**e. Fin de course** — désactivation, **sans suppression**, de `lodgify-availability-sync` et de
+`jet-booking`. Suppression sept jours plus tard, et seulement sur accord explicite.
+
+Règle commune : chaque module est testé en parallèle de l'ancien, écart nul exigé, puis passé en
+production sur les 7 sites. Le module **Calendrier** est déjà dans `4u-lodgify` mais en double avec
+la copie de l'ancien plugin ; il ne devient unique qu'à l'étape e.
 
 ## 6. Déjà fait, hors plugin
 
@@ -119,6 +133,4 @@ plugin ; il ne devient réellement unique qu'une fois A, B et C passés et l'anc
 - `lodgify-booking-box` désactivé sur sintmaarten (widget officiel Lodgify, mono-compte,
   `%website_id%` jamais substitué — voir `~/lodgify-dev/RAPPORT-booking-box.md`) ;
 - route `/ical-sync` neutralisée par mu-plugin (écrivain latent vers `jet_apartment_bookings`) ;
-- `4u-real-estate-sync` : **à préciser** — c'est le plugin qui sert `POST /wp-json/4u-sync/v1/properties`,
-  seul appelant réel étant le CRM externe (axios, 104.192.4.22). Il écrit des posts. Point ouvert
-  dans la question de l'écrivain unique.
+- `4u-real-estate-sync` : **c'est le CRM du propriétaire. Ne jamais y toucher.**
