@@ -3,7 +3,7 @@
  * Plugin Name:       4U Lodgify
  * Plugin URI:        https://github.com/4UJules/4u-lodgify
  * Description:       Intégration Lodgify unifiée : comptes, calendrier, webhooks temps réel. Remplace progressivement lodgify-availability-sync.
- * Version:           1.0.6
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            4U Real Estate
@@ -15,7 +15,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'FOURU_LODGIFY_VERSION', '1.0.6' );
+define( 'FOURU_LODGIFY_VERSION', '1.1.0' );
 define( 'FOURU_LODGIFY_FILE', __FILE__ );
 define( 'FOURU_LODGIFY_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FOURU_LODGIFY_URL', plugin_dir_url( __FILE__ ) );
@@ -61,3 +61,9 @@ register_activation_hook( __FILE__, function () {
 	FourU_Lodgify_Webhooks::creer_tables();
 	FourU_Lodgify_Webhooks::jeton();   // genere le secret d'URL si absent
 } );
+
+/* Filtre de dates de l'accueil : charge toujours, actif seulement sur option
+   (voir FourU_Lodgify_Filtre_Dates::OPTION). Permet de comparer l'ancienne et
+   la nouvelle implementation avant de retirer JetBooking. */
+require_once FOURU_LODGIFY_DIR . 'filtres/class-filtre-dates.php';
+FourU_Lodgify_Filtre_Dates::init();
