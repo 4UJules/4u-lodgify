@@ -224,8 +224,9 @@ class FourU_Lodgify_Webhooks {
 	/* Abonnement cote Lodgify                                             */
 	/* ------------------------------------------------------------------ */
 
-	private static function appel( $chemin, $corps, $cle ) {
-		$r = wp_remote_post( self::BASE . $chemin, array(
+	private static function appel( $chemin, $corps, $cle, $methode = 'POST' ) {
+		$r = wp_remote_request( self::BASE . $chemin, array(
+			'method'  => $methode,
 			'headers' => array( 'X-ApiKey' => $cle, 'accept' => 'application/json', 'content-type' => 'application/json' ),
 			'body'    => wp_json_encode( $corps ),
 			'timeout' => 25,
@@ -272,7 +273,20 @@ class FourU_Lodgify_Webhooks {
 		return $r;
 	}
 
+	/**
+	 * Retrait d'un abonnement.
+	 *
+	 * La methode est DELETE, pas POST : /unsubscribe en POST repond 405
+	 * (mesure du 21/09/2026). L'identifiant passe dans le CORPS, pas dans
+	 * l'URL - DELETE /unsubscribe/{id} repond 404.
+	 */
 	public static function desabonner( $cle, $id ) {
-		return self::appel( '/unsubscribe', array( 'id' => $id ), $cle );
+		$r = self::appel( '/unsubscribe', array( 'id' => $id ), $cle, 'DELETE' );
+		if ( ! is_wp_error( $r ) && $r['code'] < 300 ) {
+			$abos = (array) get_option( 'fouru_lodgify_abonnements', array() );
+			unset( $abos[ $id ] );
+			update_option( 'fouru_lodgify_abonnements', $abos, false );
+		}
+		return $r;
 	}
 }
