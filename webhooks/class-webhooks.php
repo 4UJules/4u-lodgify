@@ -90,7 +90,16 @@ class FourU_Lodgify_Webhooks {
 			   Il est compare en temps constant pour ne rien laisser fuiter. */
 			'permission_callback' => function ( $requete ) {
 				$fourni = (string) $requete->get_param( 'jeton' );
-				return $fourni && hash_equals( self::jeton(), $fourni );
+				if ( ! $fourni || ! hash_equals( self::jeton(), $fourni ) ) { return false; }
+
+				/* L'en-tete de signature est « ms-signature », identifie sur une
+				   livraison reelle. On le consigne pour pouvoir, une fois
+				   l'algorithme confirme, passer du jeton a une vraie
+				   verification. Tant que l'algorithme n'est pas etabli, refuser
+				   sur ce seul critere couperait des evenements legitimes. */
+				$sig = $requete->get_header( 'ms_signature' );
+				if ( $sig ) { update_option( 'fouru_lodgify_derniere_signature', substr( $sig, 0, 190 ), false ); }
+				return true;
 			},
 		) );
 	}
@@ -101,15 +110,14 @@ class FourU_Lodgify_Webhooks {
 	 */
 	public static function recevoir( WP_REST_Request $requete ) {
 		$debut = microtime( true );
-		$corps = (array) $requete->get_json_params();
+		$brut = (array) $requete->get_json_params();
 
-		/* Les en-tetes sont consignes une fois : Lodgify renvoie un secret a
-		   l'inscription mais ne documente pas l'en-tete de signature. Le seul
-		   moyen de le trouver est de regarder une livraison reelle. */
-		if ( ! get_option( 'fouru_lodgify_entetes_vus' ) ) {
-			update_option( 'fouru_lodgify_entetes_vus', array_keys( (array) $requete->get_headers() ), false );
-		}
-		$evt   = (string) ( $corps['event'] ?? $corps['event_type'] ?? $requete->get_param( 'event' ) ?? '' );
+		/* Forme reelle de la charge, relevee sur une livraison du 21/09/2026 :
+		   un TABLEAU d'evenements, et le champ s'appelle « action », pas
+		   « event ». Le bien est au premier niveau pour availability_change,
+		   mais sous « booking » pour les evenements de reservation. */
+		$corps = ( isset( $brut[0] ) && is_array( $brut[0] ) ) ? $brut[0] : $brut;
+		$evt   = (string) ( $corps['action'] ?? $corps['event'] ?? $corps['event_type'] ?? '' );
 		$pid   = self::extraire_property_id( $corps );
 
 		$comptes = self::comptes_concernes( $pid );
@@ -133,6 +141,7 @@ class FourU_Lodgify_Webhooks {
 
 	/** Le nom du champ varie selon l'evenement : on ratisse large. */
 	public static function extraire_property_id( $c ) {
+		if ( isset( $c[0] ) && is_array( $c[0] ) ) { $c = $c[0]; }
 		foreach ( array( 'property_id', 'propertyId', 'house_id', 'houseId', 'rental_id' ) as $k ) {
 			if ( ! empty( $c[ $k ] ) ) { return (string) $c[ $k ]; }
 		}
