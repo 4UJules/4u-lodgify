@@ -131,6 +131,7 @@ class FourU_Lodgify_Webhooks {
 			$fait[] = $c['website_id'] . ':' . ( self::resynchroniser( $c['website_id'], $c['api_key'] ) ? 'ok' : 'echec' );
 		}
 		if ( $pid ) { self::purger_fiches( $pid ); }
+		if ( 'rate_change' === $evt ) { self::purger_tarifs(); }
 
 		$duree = (int) round( ( microtime( true ) - $debut ) * 1000 );
 		self::journaliser( $evt, $pid, $comptes ? $comptes[0]['website_id'] : '', implode( ' ', $fait ), $duree, $corps );
@@ -207,14 +208,41 @@ class FourU_Lodgify_Webhooks {
 	    continuerait de voir l'ancienne disponibilite malgre la resynchro. */
 	public static function purger_fiches( $property_id ) {
 		global $wpdb;
+		$property_id = (string) $property_id;
+
+		/* LE point critique. Les nuits bloquees sont injectees dans la page via
+		   window.LodgifyDates, servi depuis un transient de 10 minutes dont la
+		   cle est « lodgify_dates_ » + md5(rental_id).
+		   Ne pas le vider ici laissait les PAGES afficher l'ancienne
+		   disponibilite pendant 10 minutes alors que la base et l'endpoint AJAX
+		   etaient deja a jour - constate le 21/09/2026 sur A101 : 8 pages sur 10
+		   encore fausses 1 minute apres le webhook.
+		   Et il faut passer par delete_transient(), pas par un DELETE sur
+		   wp_options : avec Redis Object Cache actif, les transients ne sont pas
+		   en base et la purge SQL ne touche rien. */
+		delete_transient( 'lodgify_dates_' . md5( $property_id ) );
+
 		$ids = $wpdb->get_col( $wpdb->prepare(
 			"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'rental-id' AND meta_value = %s", $property_id ) );
 		foreach ( $ids as $id ) {
 			if ( function_exists( 'rocket_clean_post' ) ) { rocket_clean_post( (int) $id ); }
-			if ( function_exists( 'lodgify_calendar_vider_dates' ) ) { lodgify_calendar_vider_dates( $property_id ); }
-			delete_transient( 'lodgify_calendar_prices_' . $property_id );
 		}
 		return count( $ids );
+	}
+
+	/**
+	 * Tarifs : la cle de cache integre les bornes de dates, donc elle n'est pas
+	 * enumerable bien par bien. Sur un rate_change on vide donc le groupe
+	 * entier, ce qui reste peu couteux (rechargement a la demande).
+	 */
+	public static function purger_tarifs() {
+		global $wpdb;
+		$wpdb->query(
+			"DELETE FROM {$wpdb->options}
+			 WHERE option_name LIKE '\\_transient\\_lcal\\_px\\_%'
+			    OR option_name LIKE '\\_transient\\_timeout\\_lcal\\_px\\_%'"
+		);
+		if ( function_exists( 'wp_cache_flush_group' ) ) { wp_cache_flush_group( 'transient' ); }
 	}
 
 	/** Journal borne : on gagne le diagnostic sans laisser gonfler la base. */
