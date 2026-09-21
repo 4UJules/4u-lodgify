@@ -6,6 +6,7 @@
  * sur la fiche ET sur toutes ses traductions Polylang en une fois.
  *
  * @package Lodgify_Comptes
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

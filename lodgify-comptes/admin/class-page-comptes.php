@@ -3,6 +3,7 @@
  * Ecran d'administration « Comptes Lodgify ».
  *
  * @package FourU_Lodgify
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

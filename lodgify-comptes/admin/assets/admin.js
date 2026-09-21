@@ -1,6 +1,7 @@
 /**
  * Ecran « Comptes Lodgify » : test de connexion, lecture des biens,
  * association bien Lodgify <-> fiche du site.
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 (function ($) {
 	'use strict';

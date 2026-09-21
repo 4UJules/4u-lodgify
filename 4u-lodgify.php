@@ -3,19 +3,23 @@
  * Plugin Name:       4U Lodgify
  * Plugin URI:        https://github.com/4UJules/4u-lodgify
  * Description:       Intégration Lodgify unifiée : comptes, calendrier, webhooks temps réel. Remplace progressivement lodgify-availability-sync.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
- * Author:            4U Real Estate
+ * Author:            4U Real Estate Agency
+ * Author URI:        https://www.4u-realestate.com
+ * License:           Proprietary — All rights reserved
  * Text Domain:       4u-lodgify
  * Domain Path:       /languages
+ *
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  *
  * @package FourU_Lodgify
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'FOURU_LODGIFY_VERSION', '1.1.0' );
+define( 'FOURU_LODGIFY_VERSION', '1.2.0' );
 define( 'FOURU_LODGIFY_FILE', __FILE__ );
 define( 'FOURU_LODGIFY_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FOURU_LODGIFY_URL', plugin_dir_url( __FILE__ ) );

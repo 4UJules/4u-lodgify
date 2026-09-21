@@ -13,6 +13,7 @@
  * servie depuis le cache, supprime l'appel au lieu de l'accelerer.
  *
  * @package Lodgify_Calendar
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

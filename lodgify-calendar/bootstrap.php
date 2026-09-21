@@ -7,6 +7,7 @@
  * de deplacer le dossier tel quel vers 4u-lodgify.
  *
  * @package Lodgify_Calendar
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

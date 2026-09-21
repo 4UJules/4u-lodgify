@@ -15,6 +15,7 @@
  * Quotas documentes : 750 req/min sur v2, 10 req/min sur les flux .ics.
  *
  * @package FourU_Lodgify
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }

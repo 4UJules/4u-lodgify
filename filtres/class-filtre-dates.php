@@ -16,6 +16,7 @@
  * « oui » : on compare d'abord les deux implementations bien par bien.
  *
  * @package FourU_Lodgify
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -87,28 +88,57 @@ class FourU_Lodgify_Filtre_Dates {
 		return array_map( 'intval', $ids );
 	}
 
-	/** Reprend le contrat de JetBooking, a l'identique. */
+	/**
+	 * Reprend le contrat de JetBooking, et rattrape le cas ou il est passe avant.
+	 *
+	 * JetBooking s'accroche au meme filtre en priorite 10 : il RETIRE l'entree
+	 * `checkin_checkout` de meta_query et pose son propre `post__not_in`. En
+	 * priorite 20, chercher cette entree ne donne donc plus rien et ce module
+	 * reste inerte - mesure sur thehills le 2026-09-21 : 22 fiches exclues par
+	 * JetBooking la ou la table en designe 102.
+	 *
+	 * On lit donc aussi `jet_booking_period`, que JetBooking renseigne au moment
+	 * ou il consomme l'entree. Les deux listes sont additionnees tant que les
+	 * deux plugins cohabitent : on n'affiche jamais comme libre ce que l'une des
+	 * deux sources dit occupe. Quand JetBooking partira, il ne restera que la
+	 * notre.
+	 */
 	public static function appliquer( $query ) {
-		if ( ! self::actif() || empty( $query['meta_query'] ) ) { return $query; }
+		if ( ! self::actif() ) { return $query; }
 
-		foreach ( (array) $query['meta_query'] as $i => $mq ) {
-			if ( ! isset( $mq['key'] ) ) { continue; }
-			// JetBooking accepte la coquille « chekin_checkout » : on fait pareil.
-			if ( 'checkin_checkout' !== $mq['key'] && 'chekin_checkout' !== $mq['key'] ) { continue; }
+		$bornes = null;
 
-			$bornes = (array) $mq['value'];
-			if ( count( $bornes ) < 2 ) { continue; }
-			list( $from, $to ) = array_values( $bornes );
+		// Cas 1 : l'entree est encore la (JetBooking absent, ou passe apres nous).
+		if ( ! empty( $query['meta_query'] ) ) {
+			foreach ( (array) $query['meta_query'] as $i => $mq ) {
+				if ( ! isset( $mq['key'] ) ) { continue; }
+				// JetBooking accepte la coquille « chekin_checkout » : on fait pareil.
+				if ( 'checkin_checkout' !== $mq['key'] && 'chekin_checkout' !== $mq['key'] ) { continue; }
 
-			$query['jet_booking_period'] = array( $from, $to );
-			unset( $query['meta_query'][ $i ] );
+				$v = (array) $mq['value'];
+				if ( count( $v ) < 2 ) { continue; }
 
-			$exclus = self::biens_indisponibles( $from, $to );
-			if ( $exclus ) {
-				// Si JetBooking tourne encore, on additionne plutot que d'ecraser.
-				$deja = isset( $query['post__not_in'] ) ? (array) $query['post__not_in'] : array();
-				$query['post__not_in'] = array_values( array_unique( array_merge( $deja, $exclus ) ) );
+				$bornes = array_values( $v );
+				$query['jet_booking_period'] = $bornes;
+				unset( $query['meta_query'][ $i ] );
+				break;
 			}
+		}
+
+		// Cas 2 : JetBooking est passe avant nous et a deja consomme l'entree.
+		if ( null === $bornes && ! empty( $query['jet_booking_period'] ) ) {
+			$v = (array) $query['jet_booking_period'];
+			if ( count( $v ) >= 2 ) { $bornes = array_values( $v ); }
+		}
+
+		if ( null === $bornes ) { return $query; }
+
+		list( $from, $to ) = $bornes;
+
+		$exclus = self::biens_indisponibles( $from, $to );
+		if ( $exclus ) {
+			$deja = isset( $query['post__not_in'] ) ? (array) $query['post__not_in'] : array();
+			$query['post__not_in'] = array_values( array_unique( array_merge( $deja, $exclus ) ) );
 		}
 
 		return $query;

@@ -10,6 +10,7 @@
  *   - nuit occupee, veille occupee        -> jour reserve
  * Un jour "depart uniquement" s'affiche donc comme un jour libre, sans marqueur,
  * comme le fait Airbnb.
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 (function ($) {
     'use strict';
