@@ -3,7 +3,7 @@
  * Plugin Name:       4U Lodgify
  * Plugin URI:        https://github.com/4UJules/4u-lodgify
  * Description:       Intégration Lodgify unifiée : comptes, calendrier, webhooks temps réel. Remplace progressivement lodgify-availability-sync.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            4U Real Estate
@@ -15,7 +15,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'FOURU_LODGIFY_VERSION', '1.0.0' );
+define( 'FOURU_LODGIFY_VERSION', '1.0.1' );
 define( 'FOURU_LODGIFY_FILE', __FILE__ );
 define( 'FOURU_LODGIFY_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FOURU_LODGIFY_URL', plugin_dir_url( __FILE__ ) );
@@ -24,16 +24,35 @@ define( 'FOURU_LODGIFY_URL', plugin_dir_url( __FILE__ ) );
  * Les modules sont autonomes et montes dans un ordre volontaire :
  * « comptes » est la source des cles API, donc il precede tout le reste.
  *
- * Tant que lodgify-availability-sync tourne encore, ces deux modules sont
- * charges par LUI et pas par nous : on ne les monte ici que s'ils ne sont pas
- * deja presents, sinon PHP planterait sur une redeclaration de classe.
+ * MAIS : tant que lodgify-availability-sync est actif, c'est LUI qui charge sa
+ * propre copie de ces deux modules. Les charger ici aussi declarerait les memes
+ * classes deux fois - erreur fatale, site blanc.
+ *
+ * Un test class_exists() ne suffit PAS : « 4u-lodgify » passe avant
+ * « lodgify-availability-sync » dans l'ordre alphabetique de chargement, donc
+ * au moment ou ce fichier s'execute les classes n'existent pas encore et le
+ * garde laisserait passer. On interroge donc directement la liste des
+ * extensions actives, disponible des ce stade.
  */
-if ( ! class_exists( 'FourU_Lodgify_Comptes' ) && file_exists( FOURU_LODGIFY_DIR . 'lodgify-comptes/bootstrap.php' ) ) {
-	require_once FOURU_LODGIFY_DIR . 'lodgify-comptes/bootstrap.php';
+$fouru_ancien_plugin_actif = in_array(
+	'lodgify-availability-sync/lodgify-availability-sync.php',
+	(array) get_option( 'active_plugins', array() ),
+	true
+);
+
+if ( ! $fouru_ancien_plugin_actif ) {
+	if ( ! class_exists( 'FourU_Lodgify_Comptes' ) && file_exists( FOURU_LODGIFY_DIR . 'lodgify-comptes/bootstrap.php' ) ) {
+		require_once FOURU_LODGIFY_DIR . 'lodgify-comptes/bootstrap.php';
+	}
+	if ( ! function_exists( 'lodgify_calendar_dates' ) && file_exists( FOURU_LODGIFY_DIR . 'lodgify-calendar/bootstrap.php' ) ) {
+		require_once FOURU_LODGIFY_DIR . 'lodgify-calendar/bootstrap.php';
+	}
 }
-if ( ! function_exists( 'lodgify_calendar_dates' ) && file_exists( FOURU_LODGIFY_DIR . 'lodgify-calendar/bootstrap.php' ) ) {
-	require_once FOURU_LODGIFY_DIR . 'lodgify-calendar/bootstrap.php';
-}
+
+/* Le module webhooks, lui, se charge toujours : il n'entre en conflit avec
+   rien et c'est le seul apport reel de cette version. Il n'utilise les classes
+   « comptes » que dans ses methodes, donc apres le chargement de l'ancien
+   plugin - l'ordre alphabetique joue cette fois en notre faveur. */
 
 require_once FOURU_LODGIFY_DIR . 'webhooks/bootstrap.php';
 
