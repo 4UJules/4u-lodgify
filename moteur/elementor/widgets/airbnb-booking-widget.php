@@ -3,6 +3,7 @@
  * Widget Elementor pour le formulaire de réservation style Airbnb
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {

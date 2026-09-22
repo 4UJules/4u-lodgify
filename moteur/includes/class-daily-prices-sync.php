@@ -2,6 +2,7 @@
 /**
  * Synchronisation des prix journaliers Lodgify
  * Stocke tous les prix pour toutes les dates dans la BDD
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {

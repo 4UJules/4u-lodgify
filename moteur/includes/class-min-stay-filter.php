@@ -9,6 +9,7 @@
  * et affiche un message de suggestion.
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {

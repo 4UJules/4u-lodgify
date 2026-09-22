@@ -3,6 +3,7 @@
  * Dynamic Tag pour afficher le séjour minimum
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {
@@ -75,12 +76,37 @@ class FourU_Moteur_Min_Stay_Tag extends FourU_Moteur_Dynamic_Tag_Base {
         
         $search_dates = $this->get_search_dates_from_url();
         $price_info = null;
-        
+
         if ($search_dates) {
-            // Avec dates de recherche → min_stay depuis l'API
+            // Avec dates : le minimum EXACT de la periode.
             $price_info = $this->get_price_info($property_id, $search_dates);
         } else {
-            // Sans dates → min_stay depuis la BDD locale
+            /* MINSTAY_20260922 - sans dates, annoncer le minimum de la nuit
+               courante induit en erreur : Six View affichait « 5 nights » alors
+               que fin decembre exige 6 ou 7. On annonce donc le PLUS PETIT
+               minimum de l'annee, explicitement presente comme un « a partir
+               de ». Le minimum exact s'affiche des que des dates sont choisies. */
+            global $wpdb;
+            $table = $wpdb->prefix . 'lodgify_daily_prices';
+            $plancher = $wpdb->get_var($wpdb->prepare(
+                "SELECT MIN(min_stay) FROM {$table}
+                 WHERE property_id = %s AND date >= %s AND date < %s AND min_stay > 0",
+                $property_id,
+                gmdate('Y-m-d'),
+                gmdate('Y-m-d', strtotime('+1 year'))
+            ));
+
+            if (null !== $plancher) {
+                $plancher = max(1, (int) $plancher);
+                $suffix = $plancher > 1 ? $settings['suffix_plural'] : $settings['suffix_singular'];
+                $prefixe = !empty($settings['prefix_text']) ? esc_html($settings['prefix_text']) . ' ' : '';
+                echo $prefixe
+                   . esc_html__('from', 'lodgify-availability-sync') . ' '
+                   . '<span class="lodgify-min-stay-valeur">' . $plancher . '</span>'
+                   . $suffix;
+                return;
+            }
+
             $price_info = $this->get_base_price($property_id);
         }
         
@@ -98,8 +124,11 @@ class FourU_Moteur_Min_Stay_Tag extends FourU_Moteur_Dynamic_Tag_Base {
             $output .= esc_html($settings['prefix_text']) . ' ';
         }
         
-        $output .= $min_stay . $suffix;
-        
+        /* CARTES_DEVIS_20260922 : la valeur est isolee dans un porteur pour que
+           card-quotes.js puisse la remplacer par le sejour minimum du devis,
+           sans requete supplementaire ni reecriture du libelle. */
+        $output .= '<span class="lodgify-min-stay-valeur">' . $min_stay . '</span>' . $suffix;
+
         echo $output;
     }
 }

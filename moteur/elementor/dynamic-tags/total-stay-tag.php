@@ -3,6 +3,7 @@
  * Dynamic Tag pour afficher le total du séjour avec taxes et frais depuis Lodgify API
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {
@@ -89,6 +90,18 @@ class FourU_Moteur_Total_Stay_Tag extends FourU_Moteur_Dynamic_Tag_Base {
             echo esc_html($settings['fallback']);
             return;
         }
+
+        /* CARTES_DEVIS_20260922 : un sejour que Lodgify ne chiffrera pas - nuit
+           bloquee, ou duree sous le sejour minimum - ne doit afficher AUCUN
+           total. Le montant reconstruit localement serait exact au centime (0
+           ecart sur 17 comparaisons) mais porterait sur un sejour qu'on ne peut
+           pas vendre. */
+        if (!$this->sejour_possible($property_id, $search_dates, $price_info)) {
+            echo '<span class="lodgify-total-indispo">'
+               . esc_html__('Not available for these dates', 'lodgify-availability-sync')
+               . '</span>';
+            return;
+        }
         
         // Données depuis l'API Lodgify
         $nights = $price_info['nights'];
@@ -169,9 +182,20 @@ class FourU_Moteur_Total_Stay_Tag extends FourU_Moteur_Dynamic_Tag_Base {
             if (!empty($settings['prefix_text'])) {
                 $output .= esc_html($settings['prefix_text']);
             }
-            $output .= $this->format_price($total_price, $currency);
+            $output .= '<span class="lodgify-total-montant">'
+                    . $this->format_price($total_price, $currency)
+                    . '</span>';
         }
-        
+
+        /* Le devis exact arrive apres l'affichage : card-quotes.js lit ces
+           attributs, interroge lodgify_get_price (cache 10 min cote serveur) et
+           remplace le montant, ou efface tout si Lodgify repond unavailable. */
+        $output = '<span class="lodgify-total-stay" data-rental="' . esc_attr($property_id)
+                . '" data-in="' . esc_attr($search_dates['check_in'])
+                . '" data-out="' . esc_attr($search_dates['check_out'])
+                . '" data-fallback="' . esc_attr($settings['fallback']) . '">'
+                . $output . '</span>';
+
         echo $output;
     }
 }

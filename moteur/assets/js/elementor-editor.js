@@ -1,5 +1,6 @@
 /**
  * Lodgify Elementor Editor Scripts
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 (function($) {

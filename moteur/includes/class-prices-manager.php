@@ -3,6 +3,7 @@
  * Classe pour gérer les prix des propriétés Lodgify
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 // Empêcher l'accès direct au fichier

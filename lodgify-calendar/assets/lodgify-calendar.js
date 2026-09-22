@@ -148,6 +148,10 @@
                     self.prixCache[cle] = true;
                     self.prix = $.extend(self.prix || {}, r.data.prices || {});
                     self.minStay = $.extend(self.minStay || {}, r.data.min_stay || {});
+                    /* MINSTAY_20260922 : les minimums arrivent apres le premier
+                       rendu ; sans ce re-rendu, le grise des departs trop
+                       proches n'apparaitrait qu'au changement de mois. */
+                    if (self.arrivee && !self.depart) { self.render(); }
                     self.devise = r.data.currency || '';
                     self.injecterPrix();
                 }
@@ -217,7 +221,8 @@
             var n = Math.round((d - this.arrivee) / 86400000);
             var min = this.minSejour(this.arrivee, d);
             if (n < min) {
-                this.message((this.cfg.minStayMsg || 'Minimum {n}').replace('{n}', min));
+                this.message((this.cfg.minStayArriveeMsg || this.cfg.minStayMsg || 'Minimum {n}')
+                    .replace('{n}', min));
                 return;
             }
             this.depart = d;
@@ -338,6 +343,30 @@
                 /* SEL_AIRBNB_2026-09-21 : has-range n'est pose que si la plage est
                    complete. Sans depart choisi, l'arrivee reste un rond seul,
                    sans amorce de bande. */
+                /* MINSTAY_20260922 : une fois l'arrivee posee, un depart trop
+                   proche est grise AVANT le clic. Regle etablie sur devis reels
+                   le 2026-09-22 : Lodgify applique le MAXIMUM des min_stay sur
+                   les nuits du sejour, pas celui de la nuit d'arrivee.
+
+                   ETATS_DISTINCTS_20260922 : cet etat ne concerne que les dates
+                   LIBRES. Une nuit reservee garde son seul marqueur is-booked -
+                   barrer les deux de la meme facon laissait croire que la date
+                   est prise, alors qu'elle est seulement trop proche de
+                   l'arrivee choisie et reste vendable avec une autre arrivee. */
+                var titreJour = '';
+                if (this.cfg.selection && this.arrivee && !this.depart
+                    && d > this.arrivee
+                    && cls.indexOf('is-past') === -1
+                    && cls.indexOf('is-booked') === -1) {
+                    var ecart = Math.round((d - this.arrivee) / 86400000);
+                    var minJour = this.minSejour(this.arrivee, d);
+                    if (ecart < minJour) {
+                        cls.push('is-trop-court');
+                        titreJour = (this.cfg.minStayTitre || 'Minimum stay of {n} nights')
+                            .replace('{n}', minJour);
+                    }
+                }
+
                 var plageComplete = !!(this.arrivee && this.depart);
                 if (this.arrivee && d.getTime() === this.arrivee.getTime()) {
                     cls.push('is-start'); if (plageComplete) { cls.push('has-range'); }
@@ -346,7 +375,8 @@
                     cls.push('is-end'); if (plageComplete) { cls.push('has-range'); }
                 }
                 if (this.arrivee && this.depart && d > this.arrivee && d < this.depart) { cls.push('is-between'); }
-                cells += '<div class="' + cls.join(' ') + '" data-date="' + this.fmt(d) + '">'
+                cells += '<div class="' + cls.join(' ') + '" data-date="' + this.fmt(d) + '"'
+                      + (titreJour ? ' title="' + titreJour.replace(/"/g, '&quot;') + '"' : '') + '>'
                       + '<span class="lcal-num">' + j + '</span>'
                       + (this.cfg.showPrice ? '<span class="lcal-price"></span>' : '')
                       + '</div>';

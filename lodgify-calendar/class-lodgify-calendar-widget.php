@@ -506,6 +506,15 @@ class Lodgify_Calendar_Widget extends \Elementor\Widget_Base {
 			'minStayMsg'       => $fr
 				? 'Séjour minimum de {n} nuits pour ces dates'
 				: 'Minimum stay of {n} nights for these dates',
+			/* ETATS_DISTINCTS_20260922 : une fois l'arrivee posee, le refus ne
+			   porte plus sur « ces dates » mais sur cette arrivee-la. */
+			'minStayArriveeMsg' => $fr
+				? 'Séjour minimum de {n} nuits pour cette arrivée'
+				: 'Minimum stay of {n} nights for this arrival',
+			/* Infobulle des dates libres ecartees par le minimum. */
+			'minStayTitre'      => $fr
+				? 'Séjour minimum de {n} nuits'
+				: 'Minimum stay of {n} nights',
 			'showPrice'        => ( 'yes' === $s['price_show'] ),
 			'priceDecimals'    => ( 'yes' === $s['price_decimals'] ) ? 'yes' : '',
 			'priceSymbolAfter' => ( 'yes' === $s['price_symbol_after'] ) ? 'yes' : '',

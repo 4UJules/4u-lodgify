@@ -3,6 +3,7 @@
  * Dynamic Tag pour l'URL de réservation Lodgify
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {
@@ -74,14 +75,19 @@ class FourU_Moteur_Booking_URL_Tag extends FourU_Moteur_Dynamic_Tag_Base {
         $url .= '?currency=' . $currency . '&ref=bnbox';
         
         // Ajouter les dates si disponibles
-        if ($search_dates) {
-            $url .= '&arrival=' . $search_dates['check_in'];
-            $url .= '&departure=' . $search_dates['check_out'];
-        } else {
-            // Dates par défaut: aujourd'hui + 3 jours
-            $url .= '&arrival=' . date('Y-m-d');
-            $url .= '&departure=' . date('Y-m-d', strtotime('+3 days'));
+        /* CARTE_BOOK_20260922 : sans dates choisies, ce tag inventait
+           aujourd'hui + 3 jours et renvoyait quand meme une URL de checkout.
+           Le bouton « Book now » des cartes partait donc chez Lodgify avec des
+           dates que le visiteur n'a jamais demandees - souvent indisponibles ou
+           sous le sejour minimum. Sans dates, on renvoie la fiche du bien, que
+           l'appelant fournit en fallback_url. */
+        if ( ! $search_dates ) {
+            echo esc_url( $settings['fallback_url'] );
+            return;
         }
+
+        $url .= '&arrival=' . $search_dates['check_in'];
+        $url .= '&departure=' . $search_dates['check_out'];
         
         // Ajouter le nombre d'adultes
         $url .= '&adults=' . intval($settings['default_adults']);

@@ -3,6 +3,7 @@
  * Intégration avec Elementor - Dynamic Tags, Widgets et Ajax
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 // Empêcher l'accès direct au fichier
@@ -46,6 +47,18 @@ class FourU_Moteur_Elementor_Integration {
         add_action('wp_ajax_nopriv_lodgify_get_price', array($this, 'ajax_get_price'));
     }
     
+    /**
+     * TRAD_20260922 - langue de la page, meme logique que
+     * FourU_Moteur_Calendar_Widget::current_lang().
+     */
+    private function langue_courante() {
+        if ( function_exists( 'pll_current_language' ) ) {
+            $l = pll_current_language( 'slug' );
+            if ( $l ) { return substr( $l, 0, 2 ); }
+        }
+        return substr( (string) get_locale(), 0, 2 );
+    }
+
     /**
      * Ajouter une catégorie de widgets personnalisée
      */
@@ -158,7 +171,10 @@ class FourU_Moteur_Elementor_Integration {
             'airbnb-booking-widget',
             plugins_url('assets/css/airbnb-booking.css', dirname(__FILE__)),
             array(),
-            '1.3.8'
+            /* ETATS_DISTINCTS_20260922 : version figee en dur = feuille de style
+               resservie depuis le cache malgre les modifications. Meme piege que
+               pour airbnb-booking.js. */
+            (string) @filemtime( dirname(dirname(__FILE__)) . '/assets/css/airbnb-booking.css' )
         );
     }
     
@@ -193,7 +209,7 @@ class FourU_Moteur_Elementor_Integration {
             'airbnb-booking-widget',
             plugins_url('assets/js/airbnb-booking.js', dirname(__FILE__)),
             array('jquery'),
-            '1.5.1',
+            (string) @filemtime( dirname(dirname(__FILE__)) . '/assets/js/airbnb-booking.js' ),
             true
         );
         
@@ -217,11 +233,36 @@ class FourU_Moteur_Elementor_Integration {
                 'guests' => 'guests',
                 'for' => 'for',
             ),
+            /* ETATS_DISTINCTS_20260922 : infobulle des dates libres ecartees
+               par le sejour minimum, dans le popup.
+               TRAD_20260922 : __() ne suffit pas - aucun fichier .mo n'est
+               charge pour ce domaine, la chaine restait donc en anglais sur les
+               pages FR. On detecte la langue comme le fait deja le widget
+               calendrier (Polylang, repli sur get_locale). */
+            'i18nMinStayTitre' => ( 'fr' === $this->langue_courante() )
+                ? 'Séjour minimum de {n} nuits'
+                : 'Minimum stay of {n} nights',
             'months' => array(
                 'January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'
             ),
             'days' => array('M', 'T', 'W', 'T', 'F', 'S', 'S'),
+        ));
+
+        /* CARTES_DEVIS_20260922 : devis exact des cartes, charge APRES la page.
+           Le rendu serveur ne peut pas l'attendre - 1,9 s par appel. */
+        wp_enqueue_script(
+            'lodgify-card-quotes',
+            plugins_url('assets/js/card-quotes.js', dirname(__FILE__)),
+            array('jquery'),
+            (string) @filemtime( dirname(dirname(__FILE__)) . '/assets/js/card-quotes.js' ),
+            true
+        );
+        wp_localize_script('lodgify-card-quotes', 'lodgifyCardQuotes', array(
+            'ajaxurl'      => admin_url('admin-ajax.php'),
+            'nonce'        => wp_create_nonce('lodgify_price_nonce'),
+            'simultanees'  => 4,
+            'i18nIndispo'  => __('Not available for these dates', 'lodgify-availability-sync'),
         ));
     }
     
@@ -252,6 +293,18 @@ class FourU_Moteur_Elementor_Integration {
         
         if (empty($property_id) || empty($check_in) || empty($check_out)) {
             wp_send_json_error(['message' => 'Missing parameters']);
+            return;
+        }
+
+        /* CARTES_DEVIS_20260922 : 20 cartes = 20 devis. Sans cache, chaque
+           affichage de la page de resultats rappellerait Lodgify autant de fois.
+           Cle par bien ET par dates ET par voyageurs, 10 minutes - meme duree
+           que le transient des disponibilites. */
+        $cle_devis = 'lodgify_devis_' . md5($property_id . '|' . $check_in . '|' . $check_out . '|' . $guests);
+        $en_cache  = get_transient($cle_devis);
+        if (is_array($en_cache)) {
+            $en_cache['depuis_cache'] = true;
+            wp_send_json_success($en_cache);
             return;
         }
         
@@ -473,7 +526,7 @@ class FourU_Moteur_Elementor_Integration {
         $booking_url .= '?currency=' . $currency . '&ref=bnbox';
         $booking_url .= '&arrival=' . $check_in . '&departure=' . $check_out . '&adults=' . $guests;
         
-        wp_send_json_success([
+        $reponse = [
             'price_per_day' => round($price_per_day, 2),
             'nights' => $nights,
             'nights_total' => round($nights_total, 2),
@@ -499,7 +552,10 @@ class FourU_Moteur_Elementor_Integration {
             'price_source' => $price_source,
             'unavailable_message' => $unavailable_message,
             'quote_breakdown' => $quote_breakdown
-        ]);
+        ];
+
+        set_transient($cle_devis, $reponse, 10 * MINUTE_IN_SECONDS);
+        wp_send_json_success($reponse);
     }
 }
 

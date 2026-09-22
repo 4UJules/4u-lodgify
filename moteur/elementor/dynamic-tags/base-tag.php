@@ -3,6 +3,7 @@
  * Classe de base pour les Dynamic Tags Lodgify
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {
@@ -25,12 +26,29 @@ abstract class FourU_Moteur_Dynamic_Tag_Base extends \Elementor\Core\DynamicTags
      * Récupérer l'ID de location (rental-id) de la propriété courante
      */
     protected function get_current_property_rental_id() {
-        $post_id = get_the_ID();
-        
+        /* MINSTAY_20260922 : get_the_ID() seul ne designe pas la fiche dans tous
+           les contextes de rendu Elementor - releve sur D403 le 2026-09-22, ou
+           le meme titre rendu trois fois donnait « from 1 night » deux fois et
+           « from 2 nights » une fois, pour un seul et meme bien.
+           L'ordre compte : DANS une boucle (cartes de listing, biens lies), seul
+           l'element courant fait foi - prendre l'objet interroge y ferait
+           heriter toutes les cartes du bien de la page. HORS boucle, sur une
+           page singuliere, c'est l'objet interroge qui est fiable. */
+        $post_id = 0;
+
+        if (function_exists('in_the_loop') && in_the_loop()) {
+            $post_id = (int) get_the_ID();
+        }
+        if (!$post_id && is_singular()) {
+            $post_id = (int) get_queried_object_id();
+        }
+        if (!$post_id) {
+            $post_id = (int) get_the_ID();
+        }
         if (!$post_id) {
             return false;
         }
-        
+
         $rental_id = get_post_meta($post_id, 'rental-id', true);
         return !empty($rental_id) ? $rental_id : false;
     }
@@ -249,6 +267,53 @@ abstract class FourU_Moteur_Dynamic_Tag_Base extends \Elementor\Core\DynamicTags
      * Récupérer les informations de prix depuis la BDD locale (lodgify_daily_prices)
      * PAS D'APPEL API - données pré-synchronisées
      */
+    /**
+     * CARTES_DEVIS_20260922
+     * Un sejour est impossible si l'une de ses nuits est bloquee, ou si sa duree
+     * est inferieure au sejour minimum de la periode. Mesure du 2026-09-22 :
+     * 23 cartes sur 40 affichaient un total pour un sejour que Lodgify refuse de
+     * chiffrer. On ne peut pas interroger le devis au rendu - 1,9 s par appel,
+     * 38 s pour 20 cartes - mais ces deux controles locaux coutent une requete.
+     * Le devis differe affine ensuite, cote navigateur.
+     *
+     * @return bool
+     */
+    protected function sejour_possible($property_id, $search_dates, $price_info = null) {
+        if (!$property_id || empty($search_dates['check_in']) || empty($search_dates['check_out'])) {
+            return false;
+        }
+
+        $debut = strtotime($search_dates['check_in']);
+        $fin   = strtotime($search_dates['check_out']);
+        if (!$debut || !$fin || $fin <= $debut) {
+            return false;
+        }
+
+        // 1. Sejour minimum de la periode (maximum des nuits, regle Lodgify verifiee).
+        $nuits = (int) round(($fin - $debut) / DAY_IN_SECONDS);
+        if ($price_info && isset($price_info['min_stay']) && $nuits < (int) $price_info['min_stay']) {
+            return false;
+        }
+
+        // 2. Aucune nuit bloquee entre l'arrivee et la veille du depart.
+        global $wpdb;
+        $table = $wpdb->prefix . 'lodgify_availabilities';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+            return true;
+        }
+
+        $chevauche = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table}
+             WHERE property_id = %s AND available = 0
+               AND start_date < %s AND end_date >= %s",
+            $property_id,
+            $search_dates['check_out'],
+            $search_dates['check_in']
+        ));
+
+        return 0 === $chevauche;
+    }
+
     protected function get_price_info($property_id, $search_dates = null) {
         if (!$property_id || !$search_dates) {
             return null;

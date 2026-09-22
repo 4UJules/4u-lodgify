@@ -880,3 +880,21 @@
     display: none !important;
     height: 0 !important;
 }
+
+/* ETATS_DISTINCTS_20260922 — meme regle dans le popup.
+
+   `.abw-day.disabled` (plus haut) : gris clair + rature. C'est le bon signal
+   pour une nuit RESERVEE, et lui seul.
+
+   Une date LIBRE ecartee par le SEJOUR MINIMUM porte `.abw-min-court`. Elle
+   garde `disabled` pour rester non cliquable - le gestionnaire exclut
+   `.disabled` - mais on lui rend son apparence NORMALE : ni gris, ni rature,
+   opacite pleine. Elle redevient selectionnable des que l'arrivee change.
+   L'infobulle `title` la justifie au survol, et un gestionnaire dedie affiche
+   le meme message au toucher, ou `title` ne s'affiche pas. */
+.abw-day.disabled.abw-min-court {
+    color: inherit;
+    text-decoration: none;
+    opacity: 1;
+    cursor: not-allowed;
+}

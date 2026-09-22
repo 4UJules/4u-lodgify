@@ -1,6 +1,7 @@
 /**
  * Airbnb-style Booking Widget JavaScript
  * Avec popup calendrier style Airbnb
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 (function($) {
@@ -22,9 +23,30 @@
         currentMonth: null,
         selectingField: 'arrival',
         unavailableDates: [],
+        /* RACE_NUITS_20260922 : tant que les nuits occupees ne sont pas
+           connues, le calendrier parait entierement libre. On bloque donc
+           toute selection jusqu'a leur arrivee. */
+        datesPretes: false,
+        devisOk: false,
+        /* ETATS_DISTINCTS_20260922 : minimums par nuit, pour ecarter les
+           departs trop proches AVANT le clic, comme le fait le calendrier du
+           bas. Meme source que lui : l'action lodgify_calendar_prices. */
+        minStayParNuit: {},
         
         init: function() {
             var self = this;
+
+            /* RACE_NUITS_20260922 : initGuestsDropdown() appelle
+               updateBrowserUrl(), qui SUPPRIME checkin/checkout quand aucune
+               plage n'est encore posee - et il s'execute AVANT checkUrlDates().
+               Lue en direct, window.location.search a donc deja perdu les
+               parametres, et un lien partage n'ouvrait jamais ses dates. On
+               fige la chaine d'origine ici, avant que quoi que ce soit ne la
+               reecrive. Le format meta= survivait, lui, parce que
+               updateBrowserUrl() n'y touche pas : d'ou l'asymetrie observee. */
+            if (Object.prototype.hasOwnProperty.call(self, 'urlInitiale') === false) {
+                self.urlInitiale = window.location.search;
+            }
             
             $('.airbnb-booking-widget').each(function() {
                 var $widget = $(this);
@@ -119,6 +141,7 @@
             this.currentMonth.setDate(1);
             
             this.bindEvents($widget);
+            this.majBouton();
             if (this.accountError) { this.disableBooking(); }
 
             /* AMM_PONT_CALENDRIER 2026-09-21 : le calendrier du bas de page et
@@ -130,6 +153,9 @@
                 self.arrivalDate = d.arrival ? self.parseDate(d.arrival) : null;
                 self.departureDate = d.departure ? self.parseDate(d.departure) : null;
                 self.selectingField = (self.arrivalDate && !self.departureDate) ? 'departure' : 'arrival';
+                /* Le calendrier du bas valide avant d'emettre, mais rien ne
+                   garantit que l'emetteur soit lui : on revalide ici aussi. */
+                if (!self.revaliderSelection()) { return; }
                 self.renderCalendar();
                 self.updateWidgetDisplay();
                 if (self.arrivalDate && self.departureDate) {
@@ -140,7 +166,8 @@
             });
 
             this.loadUnavailableDates();
-            
+            this.chargerMinStay();
+
             // Initialiser le dropdown voyageurs avec maxGuests AVANT de vérifier l'URL
             this.initGuestsDropdown();
             
@@ -275,7 +302,21 @@
                 });
                 
                 this.$popup.on('click', '.abw-day:not(.disabled):not(.other-month)', function() {
+                    if (!self.datesPretes) {
+                        self.showDayNotice(self.msgChargement());
+                        return;
+                    }
                     self.selectDate($(this).data('date'));
+                });
+
+                /* ETATS_DISTINCTS_20260922 : au toucher, l'attribut `title` ne
+                   s'affiche pas. Une date ecartee par le seul sejour minimum
+                   doit quand meme pouvoir se justifier : on repond au tap par
+                   le meme message. Elle reste non selectionnable. */
+                this.$popup.on('click', '.abw-day.abw-min-court', function() {
+                    var t = $(this).attr('title');
+                    if (t) { self.showDayNotice(t); }
+                    return false;
                 });
                 
                 this.$popup.on('click', '.abw-input-arrival', function() {
@@ -292,6 +333,139 @@
             }
         },
         
+        /**
+         * Minimums par nuit, sur la periode affichee. Une seule requete pour
+         * tout le calendrier, et le serveur met deja le resultat en cache.
+         */
+        chargerMinStay: function () {
+            var self = this;
+            if (!this.propertyId || typeof airbnbBooking === 'undefined') { return; }
+
+            var debut = new Date(this.currentMonth.getTime());
+            var fin = new Date(this.currentMonth.getTime());
+            fin.setMonth(fin.getMonth() + 3);
+
+            $.ajax({
+                url: airbnbBooking.ajaxurl,
+                type: 'GET',
+                dataType: 'json',
+                timeout: 20000,
+                data: {
+                    action: 'lodgify_calendar_prices',
+                    rental_id: this.propertyId,
+                    start: this.formatDate(debut),
+                    end: this.formatDate(fin)
+                },
+                success: function (r) {
+                    if (!r || !r.success || !r.data || !r.data.min_stay) { return; }
+                    self.minStayParNuit = $.extend(self.minStayParNuit || {}, r.data.min_stay);
+                    self.renderCalendar();
+                }
+            });
+        },
+
+        /** Minimum le plus contraignant entre deux dates, regle Lodgify. */
+        minSejourEntre: function (a, b) {
+            var m = 1, cur = new Date(a.getTime());
+            while (cur < b) {
+                var v = (this.minStayParNuit || {})[this.formatDate(cur)];
+                if (v && v > m) { m = v; }
+                cur.setDate(cur.getDate() + 1);
+            }
+            return m;
+        },
+
+        msgChargement: function () {
+            return (typeof airbnbBooking !== 'undefined' && airbnbBooking.i18nChargement)
+                ? airbnbBooking.i18nChargement
+                : 'Loading availability\u2026';
+        },
+
+        msgPlageInvalide: function () {
+            return (typeof airbnbBooking !== 'undefined' && airbnbBooking.i18nPlageInvalide)
+                ? airbnbBooking.i18nPlageInvalide
+                : 'Your dates include a booked night. Please choose again.';
+        },
+
+        /**
+         * RACE_NUITS_20260922 - seul endroit ou unavailableDates est etabli.
+         * Marque les dates pretes, revalide la selection en cours, re-rend et
+         * remet le bouton dans le bon etat.
+         */
+        appliquerNuits: function (liste, source) {
+            var avant = this.unavailableDates.length;
+            if (Array.isArray(liste)) {
+                for (var i = 0; i < liste.length; i++) {
+                    if (this.unavailableDates.indexOf(liste[i]) === -1) {
+                        this.unavailableDates.push(liste[i]);
+                    }
+                }
+            }
+            this.datesPretes = true;
+            console.log('ABW: nuits occupees etablies (' + (source || '?') + ') : '
+                + avant + ' -> ' + this.unavailableDates.length);
+            this.revaliderSelection();
+            if (this.selectionEnAttente) {
+                var f = this.selectionEnAttente;
+                this.selectionEnAttente = null;
+                f();
+            }
+            this.renderCalendar();
+            this.majBouton();
+        },
+
+        /**
+         * Une selection posee avant l'arrivee des nuits peut etre devenue
+         * invalide. On la verifie a chaque changement et on l'efface plutot
+         * que de la laisser produire un prix qui n'existe pas.
+         */
+        revaliderSelection: function () {
+            if (!this.arrivalDate || !this.departureDate) { return true; }
+            var cur = new Date(this.arrivalDate.getTime());
+            var occupee = false;
+            while (cur < this.departureDate) {
+                if (this.unavailableDates.indexOf(this.formatDate(cur)) !== -1) { occupee = true; break; }
+                cur.setDate(cur.getDate() + 1);
+            }
+            if (!occupee) { return true; }
+
+            this.arrivalDate = null;
+            this.departureDate = null;
+            this.selectingField = 'arrival';
+            this.devisOk = false;
+            this.masquerPrix();
+            this.showDayNotice(this.msgPlageInvalide());
+            this.updateWidgetDisplay();
+            return false;
+        },
+
+        /** Aucun prix visible : ni chiffre, ni « 0,00 ». */
+        masquerPrix: function () {
+            var $p = this.$widget.find('.abw-price-display');
+            $p.find('.abw-price-current').text('');
+            $p.find('.abw-price-original').hide();
+            $p.find('.abw-price-nights').text('');
+            this.$widget.find('.abw-with-dates').hide();
+            this.$widget.find('.abw-no-dates').show();
+        },
+
+        /**
+         * Le meme bouton sert deux fois : « Check Availability » tant qu'aucune
+         * plage n'est posee - il ouvre le calendrier et doit rester cliquable -
+         * puis « Reserve » une fois les deux dates choisies. Ce n'est que dans
+         * ce second etat qu'il doit etre bloque sans devis abouti. Le desactiver
+         * dans le premier etat empecherait d'ouvrir le popup.
+         */
+        majBouton: function () {
+            var $b = this.$widget.find('.abw-submit-btn');
+            if (!$b.length) { return; }
+            var enModeReserve = !!(this.arrivalDate && this.departureDate);
+            var ok = !enModeReserve || !!(this.datesPretes && this.devisOk);
+            $b.prop('disabled', !ok)
+              .attr('aria-disabled', ok ? 'false' : 'true')
+              .css('opacity', ok ? '1' : '0.5');
+        },
+
         loadUnavailableDates: function() {
             var self = this;
             
@@ -353,7 +527,7 @@
             
             var localesL = this.datesEmbarquees();
             if (localesL) {
-                self.unavailableDates = localesL.slice();
+                self.appliquerNuits(localesL, 'page');
                 return;
             }
 
@@ -374,11 +548,9 @@
                                     self.unavailableDates.push(date);
                                 }
                             });
-                            console.log('ABW: Total unavailable dates after API:', self.unavailableDates.length);
-                            // Re-render le calendrier si ouvert
-                            if (self.$popup && self.$popup.is(':visible')) {
-                                self.renderCalendar();
-                            }
+                            self.appliquerNuits([], 'ajax');
+                        } else {
+                            self.appliquerNuits([], 'ajax-vide');
                         }
                     },
                     error: function(xhr, status, error) {
@@ -416,8 +588,7 @@
             
             var localesR = this.datesEmbarquees();
             if (localesR) {
-                this.unavailableDates = localesR.slice();
-                this.renderCalendar();
+                this.appliquerNuits(localesR, 'page-ouverture');
                 return;
             }
 
@@ -444,9 +615,7 @@
                                         self.unavailableDates.push(date);
                                     }
                                 });
-                                console.log('ABW: Total unavailable dates:', self.unavailableDates.length);
-                                // Re-render avec les nouvelles dates
-                                self.renderCalendar();
+                                self.appliquerNuits([], 'ajax-popup');
                             }
                         }
                     }
@@ -541,6 +710,26 @@
                 if (dayDate < today || indisponible) {
                     classes.push('disabled');
                 }
+
+                /* ETATS_DISTINCTS_20260922 : une date LIBRE mais trop proche de
+                   l'arrivee est ecartee elle aussi - mais elle ne doit pas
+                   ressembler a une nuit reservee. On ajoute `disabled` pour que
+                   le gestionnaire de clic la refuse (il exclut `.disabled`), et
+                   `abw-min-court` pour que la CSS lui retire la rature. */
+                var titreJour = '';
+                if (this.selectingField === 'departure' && this.arrivalDate
+                    && dayDate > this.arrivalDate
+                    && dayDate >= today
+                    && !this.isUnavailableForDeparture(dateStr)) {
+                    var ecart = Math.round((dayDate - this.arrivalDate) / 86400000);
+                    var minJour = this.minSejourEntre(this.arrivalDate, dayDate);
+                    if (ecart < minJour) {
+                        classes.push('disabled', 'abw-min-court');
+                        titreJour = ((typeof airbnbBooking !== 'undefined' && airbnbBooking.i18nMinStayTitre)
+                            ? airbnbBooking.i18nMinStayTitre
+                            : 'Minimum stay of {n} nights').replace('{n}', minJour);
+                    }
+                }
                 
                 // Check if selected
                 /* SEL_AIRBNB_2026-09-21 : has-range seulement quand la plage est
@@ -561,7 +750,9 @@
                     classes.push('in-range');
                 }
                 
-                html += '<div class="' + classes.join(' ') + '" data-date="' + dateStr + '">' + d + '</div>';
+                html += '<div class="' + classes.join(' ') + '" data-date="' + dateStr + '"'
+                     + (titreJour ? ' title="' + titreJour.replace(/"/g, '&quot;') + '"' : '')
+                     + '>' + d + '</div>';
             }
             
             html += '</div>';
@@ -914,6 +1105,17 @@
             // Total price
             var total = data.total || data.total_price || data.price || 0;
             console.log('ABW: Total price:', total);
+
+            /* RACE_NUITS_20260922 : un devis qui echoue renvoie 0. Afficher
+               « 0,00 » ferait croire a un sejour gratuit : on n'affiche rien
+               et on laisse le bouton desactive. */
+            if (!(parseFloat(total) > 0)) {
+                this.devisOk = false;
+                this.masquerPrix();
+                this.majBouton();
+                return;
+            }
+            this.devisOk = true;
             
             // Original price (barré)
             if (data.original_total && data.original_total > total) {
@@ -946,8 +1148,9 @@
                 this.$widget.find('.abw-submit-btn').prop('disabled', true).css('opacity', '0.5');
             } else {
                 $minStayError.hide();
-                this.$widget.find('.abw-submit-btn').prop('disabled', false).css('opacity', '1');
             }
+            if (data.min_stay_error && data.min_stay) { this.devisOk = false; }
+            this.majBouton();
             
             console.log('ABW: Price display updated, showing .abw-with-dates');
             
@@ -1088,7 +1291,10 @@
         
         checkUrlDates: function() {
             var self = this;
-            var urlParams = new URLSearchParams(window.location.search);
+            var brut = (typeof this.urlInitiale === 'string' && this.urlInitiale !== '')
+                ? this.urlInitiale
+                : window.location.search;
+            var urlParams = new URLSearchParams(brut);
             var foundDates = false;
             var foundGuests = false;
             
@@ -1165,8 +1371,22 @@
             }
             
             if (foundDates) {
-                this.updateWidgetDisplay();
-                this.fetchPrice();
+                /* RACE_NUITS_20260922 : les dates de l'URL - celles qu'ecrit
+                   updateBrowserUrl(), donc un rechargement ou un lien partage -
+                   ne valent pas mieux qu'un clic. Elles ne sont appliquees
+                   qu'une fois les nuits occupees connues, et revalidees. */
+                var self = this;
+                var poser = function () {
+                    if (!self.revaliderSelection()) { self.updateBrowserUrl(); return; }
+                    self.updateWidgetDisplay();
+                    self.fetchPrice();
+                };
+                if (this.datesPretes) {
+                    poser();
+                } else {
+                    this.selectionEnAttente = poser;
+                    this.updateWidgetDisplay();
+                }
             }
         },
         

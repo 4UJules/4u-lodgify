@@ -2,6 +2,7 @@
  * Calendrier Lodgify — styles par defaut.
  * Tout ce qui est reglable depuis Elementor est surcharge par des selecteurs
  * {{WRAPPER}} : ces valeurs ne sont que le point de depart.
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 .lcal {
@@ -264,4 +265,26 @@
     color: #8a4b00;
     font-size: 13px;
     text-align: center;
+}
+
+/* ETATS_DISTINCTS_20260922 — deux refus, deux apparences.
+
+   Dans la legende du site, gris clair = reserve. Une date ecartee par le seul
+   SEJOUR MINIMUM n'est pas reservee : elle est libre, vendable avec une autre
+   arrivee. La griser ou la barrer dirait le contraire. Comportement Airbnb :
+   elle garde son APPARENCE NORMALE - couleur inchangee, prix affiche - et n'est
+   simplement pas cliquable. L'infobulle `title` dit combien de nuits sont
+   exigees ; au toucher, ou `title` n'existe pas, le clic declenche le message
+   de `choisir()`, qui reste attache a toutes les dates.
+
+   Seule la nuit RESERVEE (.is-booked, defini plus haut) reste gris clair et
+   barree. */
+.lcal-selectable .lcal-day.is-trop-court {
+    cursor: not-allowed;
+}
+
+/* Une date reservee garde son apparence de date reservee, meme si elle tombe
+   aussi sous le minimum : l'indisponibilite prime. */
+.lcal-selectable .lcal-day.is-trop-court.is-booked {
+    text-decoration: line-through;
 }

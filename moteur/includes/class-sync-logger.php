@@ -4,6 +4,7 @@
  * Stocke uniquement les logs de la DERNIÈRE synchronisation de chaque type
  *
  * @package FourU_Moteur_Availability_Sync
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {

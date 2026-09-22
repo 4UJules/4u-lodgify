@@ -2,6 +2,7 @@
 /**
  * Gestion des configurations API Lodgify
  * Permet d'ajouter/modifier/supprimer plusieurs API Lodgify depuis l'admin
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 if (!defined('ABSPATH')) {

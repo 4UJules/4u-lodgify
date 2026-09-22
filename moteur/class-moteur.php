@@ -2,18 +2,20 @@
 /**
  * Moteur Lodgify — disponibilites, prix, widget de reservation, dynamic tags.
  *
- * MOTEUR_20260923 : code repris TEL QUEL de lodgify-availability-sync, sans
- * reecriture. Seules trois choses ont ete adaptees :
- *   - les classes `Lodgify_*` sont prefixees `FourU_Moteur_*`, pour que les
- *     deux extensions puissent cohabiter pendant la periode de comparaison ;
- *   - les constantes LODGIFY_SYNC_* deviennent FOURU_MOTEUR_* ;
- *   - le chargement pointe vers les modules deja presents dans 4u-lodgify
- *     (comptes, calendrier) au lieu de les redeclarer.
+ * MOTEUR_20260923 : code repris TEL QUEL de lodgify-availability-sync, depuis
+ * la version VIVANTE du serveur — correctifs du 22/09 compris (RACE_NUITS,
+ * ETATS_DISTINCTS, CARTES_DEVIS, CARTE_BOOK, MINSTAY, TRAD). Une premiere
+ * copie, prise plus tot dans la journee, les aurait tous effaces en silence.
  *
- * Ce qui n'a PAS bouge, et ne doit pas bouger : noms des widgets Elementor,
- * actions AJAX, dynamic tags, tables, metas, transients, classes CSS.
+ * Seules adaptations, mecaniques : classes `Lodgify_*` prefixees
+ * `FourU_Moteur_*` pour la cohabitation, constantes `LODGIFY_SYNC_*` renommees,
+ * et chargement qui ne redeclare plus comptes ni calendrier.
+ *
+ * Inchanges : noms des widgets Elementor, actions AJAX, dynamic tags, tables,
+ * metas, transients, classes CSS.
  *
  * @package FourU_Lodgify
+ * Copyright (c) 2026 4U Real Estate Agency. All rights reserved.
  */
 
 // Empêcher l'accès direct au fichier
@@ -30,7 +32,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-min-stay-filter.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-sync-logger.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-message-settings.php';
 
-/* Le fichier de debug temporaire de l'ancien plugin n'est pas repris. */
+/* Fichier de debug temporaire non repris. */
 
 // Inclure l'intégration Elementor
 require_once plugin_dir_path(__FILE__) . 'elementor/elementor-integration.php';
@@ -1608,11 +1610,11 @@ class FourU_Moteur_Availability_Sync {
 // Initialiser le plugin
 /* Module autonome « Calendrier Lodgify ». Un seul point d'entree : ce require.
    Le dossier lodgify-calendar/ peut etre deplace tel quel vers 4u-lodgify. */
-/* Calendrier : deja charge par 4u-lodgify.php, on ne le redeclare pas. */
+/* Calendrier : deja charge par 4u-lodgify.php. */
 
 /* Module autonome « Comptes Lodgify » : source unique des cles API.
    Le tableau $api_keys code en dur ne doit plus servir. */
-/* Comptes : deja charge par 4u-lodgify.php, on ne le redeclare pas. */
+/* Comptes : deja charge par 4u-lodgify.php. */
 
 $lodgify_availability_sync = new FourU_Moteur_Availability_Sync();
 
