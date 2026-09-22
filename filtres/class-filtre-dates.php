@@ -93,6 +93,75 @@ class FourU_Lodgify_Filtre_Dates {
 	}
 
 	/**
+	 * AJAX_DATES_20260922 - recuperer les dates quand JetSmartFilters les perd.
+	 *
+	 * Quand on actionne un filtre depuis la page de resultats, JSF reconstruit
+	 * la requete a partir de ses SEULS widgets de filtre. Charge capturee sur
+	 * thehills le 2026-09-22 :
+	 *
+	 *   action=jet_smart_filters
+	 *   provider=jet-engine/filter-vacation-en
+	 *   query[_tax_query_building]=1393
+	 *
+	 * Les dates n'y sont pas : elles etaient arrivees par l'URL en
+	 * `meta=checkin_checkout!date:…`, et aucun widget de filtre ne les porte.
+	 * Resultat mesure : le bien A105, dont la nuit du 10 novembre est reservee,
+	 * reapparaissait comme disponible - un risque de surreservation.
+	 *
+	 * Le navigateur envoie le referer avec la requete AJAX, et ce referer est
+	 * l'URL de la page de resultats, dates comprises. On les y relit.
+	 *
+	 * @return array|null Bornes [debut, fin] au format Y-m-d, ou null.
+	 */
+	public static function bornes_depuis_referer() {
+		if ( ! wp_doing_ajax() ) { return null; }
+
+		$ref = isset( $_SERVER['HTTP_REFERER'] ) ? (string) wp_unslash( $_SERVER['HTTP_REFERER'] ) : '';
+		if ( '' === $ref ) { return null; }
+
+		// Ne suivre que nos propres pages.
+		$hote = wp_parse_url( $ref, PHP_URL_HOST );
+		if ( ! $hote || ! in_array( strtolower( $hote ), self::hotes_acceptes(), true ) ) { return null; }
+
+		$qs = wp_parse_url( $ref, PHP_URL_QUERY );
+		if ( ! $qs ) { return null; }
+		parse_str( $qs, $p );
+
+		$meta = isset( $p['meta'] ) ? (string) $p['meta'] : '';
+		if ( '' === $meta || false === strpos( $meta, 'checkin_checkout!date:' ) ) { return null; }
+
+		$part = explode( 'checkin_checkout!date:', $meta );
+		$part = explode( ';', $part[1] )[0];
+		$deux = explode( '-', $part );
+		if ( count( $deux ) !== 2 ) { return null; }
+
+		$iso = static function ( $v ) {
+			$m = explode( '.', $v );
+			if ( count( $m ) !== 3 ) { return ''; }
+			return sprintf( '%04d-%02d-%02d', (int) $m[0], (int) $m[1], (int) $m[2] );
+		};
+		$a = $iso( $deux[0] );
+		$z = $iso( $deux[1] );
+		if ( '' === $a || '' === $z || $z <= $a ) { return null; }
+
+		return array( $a, $z );
+	}
+
+	/** Hotes du site, pour ne pas suivre un referer etranger. */
+	private static function hotes_acceptes() {
+		$hotes = array();
+		foreach ( array( home_url(), site_url() ) as $u ) {
+			$h = wp_parse_url( $u, PHP_URL_HOST );
+			if ( $h ) {
+				$h = strtolower( $h );
+				$hotes[] = $h;
+				$hotes[] = ( 0 === strpos( $h, 'www.' ) ) ? substr( $h, 4 ) : 'www.' . $h;
+			}
+		}
+		return array_values( array_unique( $hotes ) );
+	}
+
+	/**
 	 * MINSTAY_20260922 - biens dont le sejour minimum depasse la duree cherchee.
 	 *
 	 * Regle etablie sur devis Lodgify reels le 2026-09-22 : c'est le MAXIMUM des
@@ -166,6 +235,11 @@ class FourU_Lodgify_Filtre_Dates {
 		if ( null === $bornes && ! empty( $query['jet_booking_period'] ) ) {
 			$v = (array) $query['jet_booking_period'];
 			if ( count( $v ) >= 2 ) { $bornes = array_values( $v ); }
+		}
+
+		// Cas 3 : requete AJAX de JetSmartFilters.
+		if ( null === $bornes ) {
+			$bornes = self::bornes_depuis_referer();
 		}
 
 		if ( null === $bornes ) { return $query; }
