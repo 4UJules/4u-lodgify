@@ -127,6 +127,39 @@ Règle commune : chaque module est testé en parallèle de l'ancien, écart nul 
 production sur les 7 sites. Le module **Calendrier** est déjà dans `4u-lodgify` mais en double avec
 la copie de l'ancien plugin ; il ne devient unique qu'à l'étape e.
 
+## 5 bis. Le couplage qui conditionne la bascule par module
+
+**Les quatre widgets Elementor de l'ancien plugin sont enregistrés par une seule méthode**,
+`Lodgify_Elementor_Integration::register_widgets_new()`, accrochée à `elementor/widgets/register` :
+
+```php
+$widgets_manager->register(new Lodgify_Price_Widget());
+$widgets_manager->register(new Lodgify_Booking_Button_Widget());
+$widgets_manager->register(new Lodgify_Total_Price_Widget());
+$widgets_manager->register(new Lodgify_Airbnb_Booking_Elementor_Widget());
+```
+
+Conséquence : **`remove_action()` sur ce hook retirerait les quatre d'un coup.** Le module
+« réservation » (b) ne peut donc pas être basculé seul par cette voie sans emporter les widgets de
+prix (c). Les deux seraient couplés, contrairement au principe du §4.
+
+**Voie retenue — désenregistrer au niveau d'Elementor, pas de WordPress.** Le module rapatrié
+s'accroche au **même hook `elementor/widgets/register` à une priorité plus tardive** et fait :
+
+```php
+$widgets_manager->unregister( 'lodgify_airbnb_booking' );   // Elementor 3.5+
+$widgets_manager->register( new FourU_Lodgify_Widget_Reservation() );
+```
+
+Le nom de type reste `lodgify_airbnb_booking`, donc aucun `_elementor_data` n'est orphelin (§3).
+Chaque module retire **son** widget et lui seul : la bascule redevient atomique par module.
+
+Même principe pour les points AJAX partagés : `remove_all_actions( 'wp_ajax_nopriv_lodgify_get_unavailable_dates' )`
+puis réenregistrement, plutôt que de toucher au constructeur de l'ancien plugin.
+
+**À vérifier au premier portage** : que `unregister()` existe bien dans la version d'Elementor
+installée (4.2.x sur le parc) et qu'appeler `register()` juste après dans le même hook est accepté.
+
 ## 6. Déjà fait, hors plugin
 
 - `lodgify-cancellation-cleaner` inactif partout ;
