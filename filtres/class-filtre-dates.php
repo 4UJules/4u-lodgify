@@ -77,6 +77,10 @@ class FourU_Lodgify_Filtre_Dates {
 		) );
 		if ( ! $biens ) { return array(); }
 
+		$biens = array_merge( $biens, self::biens_sous_sejour_minimum( $a, $z ) );
+		$biens = array_values( array_unique( $biens ) );
+		if ( ! $biens ) { return array(); }
+
 		$dans = implode( ',', array_fill( 0, count( $biens ), '%s' ) );
 		$ids = $wpdb->get_col( $wpdb->prepare(
 			"SELECT DISTINCT p.ID FROM {$wpdb->posts} p
@@ -86,6 +90,39 @@ class FourU_Lodgify_Filtre_Dates {
 		) );
 
 		return array_map( 'intval', $ids );
+	}
+
+	/**
+	 * MINSTAY_20260922 - biens dont le sejour minimum depasse la duree cherchee.
+	 *
+	 * Regle etablie sur devis Lodgify reels le 2026-09-22 : c'est le MAXIMUM des
+	 * `min_stay` sur les nuits du sejour qui s'applique, pas celui de la nuit
+	 * d'arrivee. Verifie sur D403 (nuit du 18/12 a 3, fenetre libre) : 3 et 4
+	 * nuits refuses, 5 nuits acceptes a 1738,09 $. La table locale concorde donc
+	 * exactement avec ce que le devis accepte ou refuse - on peut filtrer sans
+	 * appeler l'API.
+	 *
+	 * Proposer un bien qu'on ne peut pas reserver est un faux resultat, au meme
+	 * titre qu'un bien deja occupe.
+	 *
+	 * @return array Identifiants Lodgify (property_id).
+	 */
+	public static function biens_sous_sejour_minimum( $a, $z ) {
+		global $wpdb;
+
+		$nuits = (int) round( ( strtotime( $z ) - strtotime( $a ) ) / DAY_IN_SECONDS );
+		if ( $nuits < 1 ) { return array(); }
+
+		$t = $wpdb->prefix . 'lodgify_daily_prices';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) !== $t ) { return array(); }
+
+		return (array) $wpdb->get_col( $wpdb->prepare(
+			"SELECT property_id FROM {$t}
+			 WHERE date >= %s AND date < %s
+			 GROUP BY property_id
+			 HAVING MAX(min_stay) > %d",
+			$a, $z, $nuits
+		) );
 	}
 
 	/**
