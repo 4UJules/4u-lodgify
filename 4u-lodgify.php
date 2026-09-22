@@ -71,3 +71,36 @@ register_activation_hook( __FILE__, function () {
    la nouvelle implementation avant de retirer JetBooking. */
 require_once FOURU_LODGIFY_DIR . 'filtres/class-filtre-dates.php';
 FourU_Lodgify_Filtre_Dates::init();
+
+/**
+ * MOTEUR_20260923 — moteur rapatrie de lodgify-availability-sync.
+ *
+ * Le code n'a pas ete reecrit : il a ete DEPLACE tel quel. Seules trois choses
+ * ont ete adaptees, mecaniquement :
+ *   - les classes `Lodgify_*` sont prefixees `FourU_Moteur_*`, pour que les
+ *     deux extensions puissent cohabiter pendant la comparaison (88 occurrences) ;
+ *   - les constantes `LODGIFY_SYNC_*` deviennent `FOURU_MOTEUR_*` (8) ;
+ *   - le chargement ne redeclare plus les modules deja presents ici
+ *     (comptes, calendrier), et les hooks d'activation visent ce fichier.
+ *
+ * N'ont PAS bouge, et ne doivent pas bouger : noms des widgets Elementor,
+ * actions AJAX, dynamic tags, tables, metas, transients, classes CSS.
+ *
+ * Charger le fichier suffit a activer le moteur - il porte ses propres require
+ * et son instanciation - donc l'option le garde inerte par defaut.
+ */
+class FourU_Lodgify_Moteur {
+
+	const OPTION = 'fouru_lodgify_moteur';
+
+	public static function actif() {
+		return 'oui' === get_option( self::OPTION, 'non' );
+	}
+
+	public static function init() {
+		if ( ! self::actif() ) { return; }
+		$f = FOURU_LODGIFY_DIR . 'moteur/class-moteur.php';
+		if ( file_exists( $f ) ) { require_once $f; }
+	}
+}
+FourU_Lodgify_Moteur::init();
