@@ -99,6 +99,20 @@ class FourU_Lodgify_Moteur {
 
 	public static function init() {
 		if ( ! self::actif() ) { return; }
+
+		/* MOTEUR_ORDRE_20260923 : charger sur `plugins_loaded`, pas tout de
+		   suite. Le constructeur de l'integration Elementor du moteur sort
+		   si `did_action('elementor/loaded')` est faux - et « 4u-lodgify »
+		   passe AVANT « elementor » dans l'ordre alphabetique, alors que
+		   « lodgify-availability-sync » passait apres. Charge immediatement,
+		   le moteur n'enregistrait donc pas `lodgify_get_price` : mesure sur
+		   le staging le 2026-09-23, l'action etait ABSENTE tandis que
+		   `lodgify_get_unavailable_dates` et `lodgify_calendar_prices`, qui
+		   ne dependent pas d'Elementor, s'enregistraient bien. */
+		add_action( 'plugins_loaded', array( __CLASS__, 'charger' ), 5 );
+	}
+
+	public static function charger() {
 		$f = FOURU_LODGIFY_DIR . 'moteur/class-moteur.php';
 		if ( file_exists( $f ) ) { require_once $f; }
 	}
