@@ -147,7 +147,8 @@ class FourU_Moteur_Availability_Sync {
      * Activation du plugin
      */
     public function activate_plugin() {
-        // Créer les tables de base de données
+        /* MOTEUR_ACTIVATION_20260923 : create_tables() conserve, il est
+           non destructeur (dbDelta) et cree les tables si elles manquent. */
         $this->create_tables();
         
         // Planifier la tâche cron pour la synchronisation quotidienne des disponibilités
@@ -206,9 +207,12 @@ class FourU_Moteur_Availability_Sync {
             wp_unschedule_event($timestamp_prices, 'lodgify_weekly_prices_sync_cron');
         }
         
-        // Supprimer les tables de la base de données
-        $wpdb->query("DROP TABLE IF EXISTS $this->table_prices");
-        $wpdb->query("DROP TABLE IF EXISTS $this->table_availabilities");
+        /* MOTEUR_TABLES_CONSERVEES_20260923 : les deux suppressions de tables
+           ont ete retirees. Le hook de desactivation vise desormais le fichier
+           principal de 4u-lodgify : desactiver 4u-lodgify detruisait donc ses
+           PROPRES tables - lodgify_availabilities et lodgify_prices - alors
+           qu'il en est le seul proprietaire. Constate sur le staging le
+           2026-09-23 : 1361 lignes -> table absente. */
     }
     
     /**
